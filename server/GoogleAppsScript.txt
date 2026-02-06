@@ -1,0 +1,88 @@
+// --- GOOGLE APPS SCRIPT CODE ---
+// 1. Open your Google Sheet
+// 2. Extensions > Apps Script
+// 3. Paste this entire code, replacing any existing code.
+// 4. Click "Deploy" > "New Deployment"
+// 5. Select type: "Web App"
+// 6. Description: "Email Sender"
+// 7. Execute as: "Me" (your email)
+// 8. Who has access: "Anyone" (Critical for external triggering)
+// 9. Click "Deploy" and copy the "Web App URL".
+
+function doPost(e) {
+  try {
+    // Parse the incoming JSON data
+    // e.postData.contents holds the raw body string
+    const requestData = JSON.parse(e.postData.contents);
+    
+    // We expect: { recipients: [], subject: "...", body: "..." }
+    const recipients = requestData.recipients || [];
+    const customSubject = requestData.subject || "Notification";
+    const customBody = requestData.body || "No content.";
+    
+    const logs = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    // Iterate and send
+    recipients.forEach(student => {
+      try {
+        if (student.email) {
+          // Personalize if possible
+          // Current simple version just uses the pre-formatted body passed from server, 
+          // or we can personalized here if we passed a template. 
+          // For now, let's assume the body passed is generic or we send individual requests.
+          // BUT, to avoid timeouts for many students, efficient bulk sending is better.
+          // Let's assume the 'body' passed from the server is ALREADY personalized or generic enough.
+          // IF we want personalization (Hi Name), we need to do it here or loop on server.
+          // Better: Loop on SERVER (Node.js) and send 1 request per student? 
+          // OR: Loop on SERVER and send BATCH to GAS?
+          // GAS limitation: Time limits. Processing 50 emails is fine. 500 might timeout.
+          // Let's stick to the batch format causing 1 email trigger per request for now so we can return detailed logs?
+          // Actually, GAS is fast at sending.
+          
+          // Let's try sending to the list.
+          
+          let emailBody = customBody;
+          if (student.name) {
+             emailBody = emailBody.replace('{{student_name}}', student.name);
+          }
+          
+          GmailApp.sendEmail(student.email, customSubject, emailBody);
+          logs.push({ email: student.email, status: 'sent' });
+          successCount++;
+        }
+      } catch (err) {
+        logs.push({ email: student.email, status: 'failed', error: err.toString() });
+        failCount++;
+      }
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ 
+      success: true, 
+      sent: successCount, 
+      failed: failCount,
+      logs: logs 
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ 
+      success: false, 
+      error: error.toString() 
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Optional: Test function to run manually in editor
+function testSend() {
+  const testData = {
+    recipients: [{ email: "your-email@example.com", name: "Tester" }],
+    subject: "GAS Test",
+    body: "Hello {{student_name}}, this is a test from Apps Script."
+  };
+  
+  // Mock the event object
+  const e = { postData: { contents: JSON.stringify(testData) } };
+  const result = doPost(e);
+  Logger.log(result.getContent());
+}
