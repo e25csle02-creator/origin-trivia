@@ -43,7 +43,7 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-hero opacity-5" />
-      
+
       <Card className="relative w-full max-w-md border-border/50 shadow-xl">
         <CardHeader className="text-center">
           <Link to="/" className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-primary">
@@ -59,7 +59,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="sin@shanmugha.edu.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -72,7 +72,7 @@ const Login = () => {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
+                  placeholder="SIN IN CAPITAL"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required

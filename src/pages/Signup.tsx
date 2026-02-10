@@ -300,7 +300,7 @@ const Signup = () => {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
+                  placeholder="SIN IN CAPITAL"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -320,7 +320,7 @@ const Signup = () => {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="SIN IN CAPITAL"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required

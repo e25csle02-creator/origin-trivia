@@ -829,6 +829,11 @@ Deadline      : {{Deadline}}
 
 Please log in to the Origin Trivia platform and complete the activity within the given time.
 https://origin-trivia.netlify.app/
+
+Login Details:
+Email    : Your college mail ID
+Password : Your SIN number (in capital)
+
 If you have any questions, contact your faculty.
 
 Best regards,

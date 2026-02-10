@@ -188,7 +188,13 @@ Published On  : {{Publish_Date}}
 
 Please log in to the **Origin Trivia** platform and complete the activity within the given time.
 
-https://origin-trivia.netlify.app/              For any questions, please contact your faculty.
+https://origin-trivia.netlify.app/
+
+**Login Details:**
+Email    : Your college mail ID
+Password : Your SIN number (in capital)
+
+For any questions, please contact your faculty.
 
 Thank you.
 
