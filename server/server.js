@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
 import bodyParser from 'body-parser';
-import { exec, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,10 +10,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 app.use(cors({
-    origin: ['http://localhost:8080', 'http://localhost:5173', 'http://127.0.0.1:8080', 'https://origin-trivia.netlify.app'],
+    origin: ['http://localhost:8080', 'http://localhost:5173', 'http://127.0.0.1:8080', 'https://origin-trivia.netlify.app', 'https://origin-trivia.vercel.app'],
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -26,13 +25,6 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
-
-// Ensure temp directory exists
-// Ensure temp directory exists
-const tempDir = path.join(__dirname, 'temp');
-if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir);
-}
 
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
@@ -344,18 +336,6 @@ Origin Trivia Team`;
     res.json({ success: true, results });
 });
 
-try {
-    const server = app.listen(port, '0.0.0.0', () => {
-        console.log(`Compiler server listening at http://0.0.0.0:${port}`);
-    });
-
-    server.on('error', (e) => {
-        console.error("Server Error:", e);
-    });
-} catch (e) {
-    console.error("Failed to start server:", e);
-}
-
 // Global error handlers to prevent exit
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
@@ -363,3 +343,21 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// Export app for Vercel
+export default app;
+
+// Only listen if running directly (local dev)
+if (process.env.NODE_ENV !== 'production' && process.argv[1] === fileURLToPath(import.meta.url)) {
+    try {
+        const server = app.listen(port, '0.0.0.0', () => {
+            console.log(`Server listening at http://0.0.0.0:${port}`);
+        });
+
+        server.on('error', (e) => {
+            console.error("Server Error:", e);
+        });
+    } catch (e) {
+        console.error("Failed to start server:", e);
+    }
+}
