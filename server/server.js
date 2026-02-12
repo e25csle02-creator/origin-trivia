@@ -310,79 +310,78 @@ Origin Trivia Team`;
     const smtpEnabled = process.env.EMAIL_USER && process.env.EMAIL_PASS && !isPlaceholderPass && !process.env.EMAIL_USER.includes('your-email');
 
     if (smtpEnabled) {
-        if (smtpEnabled) {
-            console.log(`[SMTP] Starting concurrent send for ${recipients.length} recipients...`);
+        console.log(`[SMTP] Starting concurrent send for ${recipients.length} recipients...`);
 
-            const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASS,
-                },
-            });
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
 
-            const sendEmailPromise = async (student) => {
-                try {
-                    const subject = (customSubject || "New Quiz Available: {{quiz_title}}")
-                        .replace('{{quiz_title}}', quizDetails.title);
+        const sendEmailPromise = async (student) => {
+            try {
+                const subject = (customSubject || "New Quiz Available: {{quiz_title}}")
+                    .replace('{{quiz_title}}', quizDetails.title);
 
-                    let body = (customMessage || defaultBody)
-                        .replace(/{{Activity_Name}}/g, quizDetails.title)
-                        .replace(/{{Subject}}/g, quizDetails.subject)
-                        .replace(/{{Branch}}/g, quizDetails.branch)
-                        .replace(/{{Year}}/g, quizDetails.year)
-                        .replace(/{{Semester}}/g, quizDetails.semester)
-                        .replace(/{{Publish_Date}}/g, quizDetails.publishDate || new Date().toLocaleDateString())
-                        .replace(/{{Deadline}}/g, quizDetails.deadline || "No Deadline")
-                        .replace(/{{Faculty_Name}}/g, quizDetails.facultyName || "Faculty")
-                        .replace(/{{student_name}}/g, student.name)
-                        .replace(/{Student name}/g, student.name);
+                let body = (customMessage || defaultBody)
+                    .replace(/{{Activity_Name}}/g, quizDetails.title)
+                    .replace(/{{Subject}}/g, quizDetails.subject)
+                    .replace(/{{Branch}}/g, quizDetails.branch)
+                    .replace(/{{Year}}/g, quizDetails.year)
+                    .replace(/{{Semester}}/g, quizDetails.semester)
+                    .replace(/{{Publish_Date}}/g, quizDetails.publishDate || new Date().toLocaleDateString())
+                    .replace(/{{Deadline}}/g, quizDetails.deadline || "No Deadline")
+                    .replace(/{{Faculty_Name}}/g, quizDetails.facultyName || "Faculty")
+                    .replace(/{{student_name}}/g, student.name)
+                    .replace(/{Student name}/g, student.name);
 
-                    // Wrap individual send in retry
-                    await retryOperation(async () => {
-                        await transporter.sendMail({
-                            from: `"Origin Trivia" <${process.env.EMAIL_USER}>`,
-                            to: student.email,
-                            subject: subject,
-                            text: body
-                        });
-                    }, 2, 500); // 2 retries per student
+                // Wrap individual send in retry
+                await retryOperation(async () => {
+                    await transporter.sendMail({
+                        from: `"Origin Trivia" <${process.env.EMAIL_USER}>`,
+                        to: student.email,
+                        subject: subject,
+                        text: body
+                    });
+                }, 2, 500); // 2 retries per student
 
-                    return { email: student.email, status: 'sent', method: 'SMTP' };
-                } catch (err) {
-                    console.error(`[SMTP FAIL] ${student.email}:`, err.message);
-                    let errorMessage = err.message;
-                    if (err.responseCode === 535) errorMessage = "Auth Failed";
-                    else if (err.code === 'ECONNREFUSED') errorMessage = "Conn Refused";
+                return { email: student.email, status: 'sent', method: 'SMTP' };
+            } catch (err) {
+                console.error(`[SMTP FAIL] ${student.email}:`, err.message);
+                let errorMessage = err.message;
+                if (err.responseCode === 535) errorMessage = "Auth Failed";
+                else if (err.code === 'ECONNREFUSED') errorMessage = "Conn Refused";
 
-                    return { email: student.email, status: 'failed', error: errorMessage, method: 'SMTP' };
-                }
-            };
+                return { email: student.email, status: 'failed', error: errorMessage, method: 'SMTP' };
+            }
+        };
 
-            const smtpResults = await Promise.all(recipients.map(sendEmailPromise));
+        const smtpResults = await Promise.all(recipients.map(sendEmailPromise));
 
-            smtpResults.forEach(res => {
-                results.logs.push({ ...res, time: new Date().toISOString() });
-                if (res.status === 'sent') results.success++;
-                else results.failed++;
-            });
-        }
+        smtpResults.forEach(res => {
+            results.logs.push({ ...res, time: new Date().toISOString() });
+            if (res.status === 'sent') results.success++;
+            else results.failed++;
+        });
+    }
 
-        // --- 3. MacroDroid (Webhook) ---
-        if (process.env.MACRODROID_WEBHOOK_URL) {
-            const webhookUrlBase = process.env.MACRODROID_WEBHOOK_URL;
-            recipients.forEach(student => {
-                const subject = (customSubject || "Notification").replace('{{quiz_title}}', quizDetails.title);
-                const url = new URL(webhookUrlBase);
-                url.searchParams.append('to', student.email);
-                url.searchParams.append('subject', subject);
-                fetch(url.toString()).catch(e => console.error("MacroDroid Fail", e));
-            });
-            console.log("[MACRODROID] Triggered webhooks.");
-        }
+    // --- 3. MacroDroid (Webhook) ---
+    if (process.env.MACRODROID_WEBHOOK_URL) {
+        const webhookUrlBase = process.env.MACRODROID_WEBHOOK_URL;
+        recipients.forEach(student => {
+            const subject = (customSubject || "Notification").replace('{{quiz_title}}', quizDetails.title);
+            const url = new URL(webhookUrlBase);
+            url.searchParams.append('to', student.email);
+            url.searchParams.append('subject', subject);
+            fetch(url.toString()).catch(e => console.error("MacroDroid Fail", e));
+        });
+        console.log("[MACRODROID] Triggered webhooks.");
+    }
 
-        res.json({ success: true, results });
-    });
+    res.json({ success: true, results });
+});
 
 // Global error handlers to prevent exit
 process.on('uncaughtException', (err) => {
