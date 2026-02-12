@@ -49,30 +49,50 @@ const ActivitySubmissions = () => {
     const filteredSubmitted = filterRows(submittedRows);
     const filteredNotSubmitted = filterRows(notSubmittedRows);
 
+    // Helper for short branch name
+    const getShortBranch = (branch: string) => {
+        const map: Record<string, string> = {
+            'B.E-Computer Science & Engineering': 'B.E.CSE',
+            'B.E-CSE (Cyber Security)': 'B.E.CSE(CS)',
+            'B.E-Biomedical Engineering': 'B.E.BME',
+            'B.E- Electronics & Communication Engineering': 'B.E.ECE',
+            'B.E-Mechanical Engineering': 'B.E.Mech',
+            'B.Tech - Artificial Intelligence & Data Science': 'B.Tech.AI&DS',
+            'B.Tech - Information Technology': 'B.Tech.IT',
+            'B.Tech - Agricultural Engineering': 'B.Tech.Agri',
+            'All': 'All'
+        };
+        return map[branch] || branch.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
+    };
+
     const downloadCSV = (rows: ReportRow[], filename: string) => {
-        // Headers
-        let csvContent = "Student Name,Register Number,SIN No,Branch,Semester,Email";
+        // Headers (UPPERCASE, Removed Branch/Sem)
+        let csvContent = "STUDENT NAME,REGISTER NUMBER,SIN NO,EMAIL";
 
         if (activeTab === 'submitted') {
-            csvContent += ",Submitted At,Total Marks";
+            csvContent += ",SUBMITTED AT";
             questions.forEach((q, idx) => {
                 csvContent += `,Q${idx + 1} (${q.marks})`;
             });
+            csvContent += ",TOTAL MARKS";
         }
         csvContent += "\n";
 
         // Rows
         rows.forEach(row => {
-            let line = `"${row.student.name}","${row.student.registerNumber}","${row.student.sinNo || ''}","${row.student.branch}","${row.student.semester}","${row.student.email}"`;
+            // Removed branch and semester from data
+            let line = `"${row.student.name}","${row.student.registerNumber}","${row.student.sinNo || ''}","${row.student.email}"`;
 
             if (activeTab === 'submitted') {
                 const date = row.submittedAt ? format(new Date(row.submittedAt), 'dd-MM-yyyy HH:mm:ss') : '-';
-                line += `,"${date}","${row.totalMarks || 0}"`;
+                line += `,"${date}"`; // Total marks moved to end
 
                 questions.forEach(q => {
                     const mark = row.questionMarks?.[q.id] ?? '-';
                     line += `,${mark}`;
                 });
+
+                line += `,"${row.totalMarks || 0}"`; // Total marks appended last
             }
             csvContent += line + "\n";
         });
@@ -125,11 +145,18 @@ const ActivitySubmissions = () => {
                                 className="gap-2"
                                 onClick={() => {
                                     const list = activeTab === 'submitted' ? filteredSubmitted : filteredNotSubmitted;
-                                    const name = activeTab === 'submitted' ? 'submissions' : 'not_submitted';
-                                    const safeTitle = (activity?.title || 'Activity').replace(/[^a-z0-9]/gi, '_');
-                                    const safeBranch = (activity?.target_branch || 'All').replace(/[^a-z0-9]/gi, '_');
-                                    // Requested format: "activity name and branch name"
-                                    downloadCSV(list, `${safeTitle} - ${safeBranch}.csv`);
+
+                                    const safeTitle = (activity?.title || 'Activity').replace(/[^a-zA-Z0-9]/g, '_');
+
+                                    const branch = activity?.target_branch || 'All';
+                                    const shortBranch = getShortBranch(branch); // Use short branch
+
+                                    const year = activity?.target_year || 'All';
+                                    const sem = activity?.target_semester || 'All';
+                                    const yearSem = `${year}-${sem}`; // Safe filename format
+
+                                    // Requested format: ActivityName_ShortBranch_Year-Sem.csv
+                                    downloadCSV(list, `${safeTitle}_${shortBranch}_${yearSem}.csv`);
                                 }}
                             >
                                 <FileSpreadsheet className="h-4 w-4" />
