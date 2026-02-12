@@ -196,15 +196,15 @@ const ActivitySubmissions = () => {
                                                     link: `${window.location.origin}/student/activity/${activityId}`
                                                 },
                                                 customSubject: "Reminder: Activity Submission",
-                                                customMessage: `Hello {{Student_Name}},
+                                                customMessage: `Hello {{Student name}},
 
 This is a reminder to submit your activity before the deadline.
 
-**Deadline:** {{Deadline}}
+Deadline: {{Deadline}}
 
 ---
 
-**Activity Details**
+Activity Details
 
 Activity Name : {{Activity_Name}}
 Subject       : {{Subject}}
@@ -213,11 +213,12 @@ Year          : {{Year}}
 Semester      : {{Semester}}
 Published On  : {{Publish_Date}}
 
-Please log in to the **Origin Trivia** platform and complete the activity within the given time.
+Please log in to the Origin Trivia platform and complete the
+activity within the given time.
 
 https://origin-trivia.netlify.app/
 
-**Login Details:**
+Login Details:
 Email    : Your college mail ID
 Password : Your SIN number (in capital)
 

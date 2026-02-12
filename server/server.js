@@ -252,7 +252,8 @@ Origin Trivia Team`;
             .replace(/{{Deadline}}/gi, quizDetails.deadline || "No Deadline")
             .replace(/{{Faculty_Name}}/gi, quizDetails.facultyName || "Faculty")
             .replace(/{{student_name}}/gi, "Student")
-            .replace(/{Student name}/gi, "Student");
+            .replace(/{Student name}/gi, "Student")
+            .replace(/{{Student name}}/gi, "Student");
 
         const processedSubject = (customSubject || "New Quiz Available: {{quiz_title}}")
             .replace('{{quiz_title}}', quizDetails.title);
