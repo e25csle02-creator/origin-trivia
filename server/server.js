@@ -44,10 +44,8 @@ app.get('/api/health', (req, res) => {
 
 
 
-const openai = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.OPENROUTER_API_KEY,
-});
+// OpenAI client is initialized lazily in the route handler to prevent startup crash if key is missing
+
 
 app.post('/api/evaluate', async (req, res) => {
     const { questionText, studentAnswer, modelAnswer, rubric } = req.body;
@@ -57,6 +55,15 @@ app.post('/api/evaluate', async (req, res) => {
     }
 
     try {
+        if (!process.env.OPENROUTER_API_KEY) {
+            throw new Error('OpenRouter API Key is not configured in environment variables.');
+        }
+
+        const openai = new OpenAI({
+            baseURL: "https://openrouter.ai/api/v1",
+            apiKey: process.env.OPENROUTER_API_KEY,
+        });
+
         const completion = await openai.chat.completions.create({
             model: "google/gemini-2.0-flash-lite-preview-02-05:free", // Using a free/cheap model on OpenRouter
             messages: [
