@@ -31,15 +31,29 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors({
-    origin: [
-        'http://localhost:8080',
-        'http://localhost:8081',
-        'http://localhost:8082',
-        'http://localhost:5173',
-        'http://127.0.0.1:8080',
-        'https://origin-trivia.netlify.app',
-        'https://origin-trivia.vercel.app'
-    ],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        // Allow any localhost origin
+        if (origin.match(/^http:\/\/localhost:\d+$/) || origin.match(/^http:\/\/127\.0\.0\.1:\d+$/)) {
+            return callback(null, true);
+        }
+
+        // Allow specific production domains
+        const allowedDomains = [
+            'https://origin-trivia.netlify.app',
+            'https://origin-trivia.vercel.app'
+        ];
+
+        // Check if origin matches allowed domains or their subdomains (Netlify)
+        if (allowedDomains.includes(origin) || origin.match(/^https:\/\/.*\.netlify\.app$/)) {
+            return callback(null, true);
+        }
+
+        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -146,7 +160,44 @@ app.post('/api/compile', async (req, res) => {
                 version: pistonVersion,
                 files: [
                     {
-                        name: "Main.java", // Helps Piston identify the entry point
+                        name: (function () {
+                            if (pistonLang === 'java') {
+                                // 1. Try to find the class containing "public static void main"
+                                // This regex looks for: class [ClassName] ... { ... public static void main ... }
+                                // It's hard to do perfectly with regex, so we'll try a two-step approach or a smarter regex.
+
+                                // Simple approach: Split by class definitions and check content.
+                                // But simple regex for "class Name" is safer for filename if we just prioritize the one with main.
+
+                                // Let's iterate over matches of "class Name" and check the surrounding context? No, that's hard.
+                                // Better:
+                                // If there is a public class, that MUST be the filename.
+                                const publicClassMatch = code.match(/public\s+class\s+(\w+)/);
+                                if (publicClassMatch) return `${publicClassMatch[1]}.java`;
+
+                                // 2. Find class containing "public static void main"
+                                // We'll assume standard formatting: class Name ... public static void main
+                                // A regex is tricky for nested structures, but we can try to find the class name that is followed eventually by main.
+                                // Instead, let's just find ALL class names and check if the code block *after* the class name contains main.
+                                // This is still heuristic but better than first match.
+
+                                const classMatches = [...code.matchAll(/class\s+(\w+)/g)];
+                                if (classMatches.length > 0) {
+                                    // If we have multiple classes, we need to pick the "entry point".
+                                    // Java Piston likely runs: javac *.java -> java MainClass
+                                    // Use the first public class if any.
+                                    const publicClass = code.match(/public\s+class\s+(\w+)/);
+                                    if (publicClass) return `${publicClass[1]}.java`;
+
+                                    // If no public class, Piston needs us to guess the main class.
+                                    // Let's just return the first one found as a best-effort.
+                                    // Users should declare public class for main.
+                                    return `${classMatches[0][1]}.java`;
+                                }
+                                return "Main.java";
+                            }
+                            return "Main.java";
+                        })(),
                         content: code
                     }
                 ]

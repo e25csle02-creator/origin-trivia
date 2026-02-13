@@ -38,6 +38,25 @@ const activityTypeIcons: Record<string, React.ElementType> = {
     file_upload: Upload,
 };
 
+const activityTypeLabels: Record<string, string> = {
+    mcq: 'MCQ',
+    checkbox: 'Checkbox',
+    short_answer: 'Short Answer',
+    paragraph: 'Paragraph',
+    dropdown: 'Dropdown',
+    numerical: 'Numerical',
+    fill_blanks: 'Fill in Blanks',
+    file_upload: 'File Upload',
+    code_completion: 'Code Completion',
+    output_prediction: 'Output Prediction',
+    trace_execution: 'Trace Execution',
+    error_identification: 'Error Identification',
+    error_correction: 'Error Correction',
+    concept_identification: 'Concept Identification',
+    justification: 'Justification',
+    mixed: 'Mixed Activity',
+};
+
 const ActivityDetails = () => {
     const { activityId } = useParams<{ activityId: string }>();
     const { user, role, loading: authLoading } = useAuth();
@@ -85,7 +104,10 @@ const ActivityDetails = () => {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <Badge variant="secondary" className="gap-1"><Icon className="h-3 w-3" /> {activity.activity_type.replace('_', ' ')}</Badge>
+                                <Badge variant="secondary" className="gap-1">
+                                    <Icon className="h-3 w-3" />
+                                    {activityTypeLabels[activity.activity_type] || activity.activity_type.replace('_', ' ')}
+                                </Badge>
                                 <Badge variant={activity.is_published ? 'default' : 'outline'}>{activity.is_published ? 'Published' : 'Draft'}</Badge>
                             </div>
                             <CardTitle className="text-2xl">{activity.title}</CardTitle>
@@ -141,6 +163,12 @@ const ActivityDetails = () => {
                                                                 {opt.is_correct && <Badge variant="outline" className="ml-auto text-green-600 border-green-200">Correct</Badge>}
                                                             </div>
                                                         ))}
+                                                        {/* Explicitly show correct answer text if needed */}
+                                                        <div className="mt-2 text-sm text-muted-foreground">
+                                                            Correct Answer: <span className="font-medium text-foreground">
+                                                                {question.correct_answer || question.options?.find((o: any) => o.is_correct)?.option_text || 'Not specified'}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 )}
                                                 {question.question_type === 'code_completion' && (

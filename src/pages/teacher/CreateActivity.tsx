@@ -81,6 +81,8 @@ const CreateActivity = () => {
   const [subjectId, setSubjectId] = useState('');
   const [newSubject, setNewSubject] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [activityType, setActivityType] = useState<string>('mixed');
+  const [customActivityType, setCustomActivityType] = useState('');
   const [targetBranch, setTargetBranch] = useState(profile?.branch || 'All');
   const [targetYearSemester, setTargetYearSemester] = useState('All');
 
@@ -418,6 +420,14 @@ const CreateActivity = () => {
       setSubjectId(existingActivity.subject_id);
       setDeadline(existingActivity.deadline || '');
 
+      const type = existingActivity.activity_type || 'mixed';
+      if (['mixed', 'mcq', 'code_completion'].includes(type)) { // Basic known types we might want to support specifically or just 'mixed'
+        setActivityType(type);
+      } else {
+        setActivityType('custom');
+        setCustomActivityType(type);
+      }
+
       // Parse deadline for 12h picker
       if (existingActivity.deadline) {
         const dateObj = new Date(existingActivity.deadline);
@@ -519,7 +529,7 @@ const CreateActivity = () => {
       description,
       instructions,
       subject_id: subjectId,
-      activity_type: 'mixed' as const,
+      activity_type: activityType === 'custom' ? (customActivityType || 'Custom') : activityType,
       deadline: deadline || null,
       total_marks: totalMarks,
       is_published: isPublished,
@@ -543,7 +553,15 @@ const CreateActivity = () => {
         await updateActivityWithQuestions.mutateAsync({
           activityId: activityId,
           activityData: commonData,
-          questions: questions
+          questions: questions.map((q) => {
+            if (q.question_type === 'mcq' && !q.correct_answer) {
+              const correctOpt = q.options?.find(o => o.is_correct);
+              if (correctOpt) {
+                return { ...q, correct_answer: correctOpt.option_text };
+              }
+            }
+            return q;
+          })
         });
 
         // Check if status changed from Draft -> Published
@@ -556,10 +574,16 @@ const CreateActivity = () => {
         // --- CREATE ---
         const newActivity = await createActivity.mutateAsync({
           ...commonData,
-          questions: questions.map((q) => ({
-            ...q,
-            options: q.options
-          })),
+          questions: questions.map((q) => {
+            // For MCQs, ensure correct_answer is populated with the text of the correct option
+            if (q.question_type === 'mcq' && !q.correct_answer) {
+              const correctOpt = q.options?.find(o => o.is_correct);
+              if (correctOpt) {
+                return { ...q, correct_answer: correctOpt.option_text };
+              }
+            }
+            return q;
+          }),
           notification_email: undefined
         });
 
@@ -715,6 +739,37 @@ const CreateActivity = () => {
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle>Activity Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Activity Type</Label>
+                    <Select value={activityType} onValueChange={setActivityType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mixed">Mixed Activity (Default)</SelectItem>
+                        <SelectItem value="custom">Custom Type...</SelectItem>
+                        {/* We can add other strict types if needed, but Mixed covers most generic usecases */}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {activityType === 'custom' && (
+                    <div className="space-y-2">
+                      <Label>Custom Type Name</Label>
+                      <Input
+                        placeholder="e.g. Lab Exam, Quiz, Hackathon..."
+                        value={customActivityType}
+                        onChange={(e) => setCustomActivityType(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Notification Setup Card */}
               <Card>
                 <CardHeader>
@@ -801,7 +856,7 @@ const CreateActivity = () => {
                               toast({ title: "Connection Failed", description: `Status: ${res.status}`, variant: "destructive" });
                             }
                           } catch (e: any) {
-                            toast({ title: "Connection Error", description: `Could not reach ${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}. Is server running?`, variant: "destructive" });
+                            toast({ title: "Connection Error", description: `Could not reach ${API_BASE_URL || 'server'}. Is server running?`, variant: "destructive" });
                           }
                         }}
                       >
@@ -989,31 +1044,44 @@ Origin Trivia Team`}
 
                               {/* Type Specific Fields */}
                               {['mcq', 'checkbox', 'dropdown'].includes(question.question_type) && (
-                                <div className="space-y-2">
-                                  <Label className="text-xs text-muted-foreground">Options</Label>
-                                  {question.options.map((opt, optIdx) => (
-                                    <div key={opt.id} className="flex items-center gap-2">
-                                      <input
-                                        type={question.question_type === 'checkbox' ? 'checkbox' : 'radio'}
-                                        name={`q-${question.id}`}
-                                        checked={opt.is_correct}
-                                        onChange={() => updateOption(question.id, opt.id, { is_correct: !opt.is_correct })} // Radio logic handled in helper
-                                        className="h-4 w-4"
-                                      />
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">Options</Label>
+                                    {question.options.map((opt, optIdx) => (
+                                      <div key={opt.id} className="flex items-center gap-2">
+                                        <input
+                                          type={question.question_type === 'checkbox' ? 'checkbox' : 'radio'}
+                                          name={`q-${question.id}`}
+                                          checked={opt.is_correct}
+                                          onChange={() => updateOption(question.id, opt.id, { is_correct: !opt.is_correct })}
+                                          className="h-4 w-4"
+                                        />
+                                        <Input
+                                          value={opt.option_text}
+                                          onChange={(e) => updateOption(question.id, opt.id, { option_text: e.target.value })}
+                                          placeholder={`Option ${optIdx + 1}`}
+                                          className="flex-1 h-9"
+                                        />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(question.id, opt.id)} className="h-8 w-8">
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                    <Button type="button" variant="outline" size="sm" onClick={() => addOption(question.id)} className="w-full mt-2 border-dashed">
+                                      <Plus className="h-3 w-3 mr-2" /> Add Option
+                                    </Button>
+                                  </div>
+
+                                  {question.question_type === 'mcq' && (
+                                    <div className="space-y-2 pt-2 border-t">
+                                      <Label className="text-xs text-muted-foreground">Exact Answer Text (Optional override)</Label>
                                       <Input
-                                        value={opt.option_text}
-                                        onChange={(e) => updateOption(question.id, opt.id, { option_text: e.target.value })}
-                                        placeholder={`Option ${optIdx + 1}`}
-                                        className="flex-1 h-9"
+                                        value={question.correct_answer || ''}
+                                        onChange={(e) => updateQuestion(question.id, { correct_answer: e.target.value })}
+                                        placeholder="Auto-filled from correct option if left empty..."
                                       />
-                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(question.id, opt.id)} className="h-8 w-8">
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
                                     </div>
-                                  ))}
-                                  <Button type="button" variant="outline" size="sm" onClick={() => addOption(question.id)} className="w-full mt-2 border-dashed">
-                                    <Plus className="h-3 w-3 mr-2" /> Add Option
-                                  </Button>
+                                  )}
                                 </div>
                               )}
 
@@ -1307,7 +1375,7 @@ Origin Trivia Team`}
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-6">
+            < div className="space-y-6" >
               <Card>
                 <CardHeader>
                   <CardTitle>Subject</CardTitle>

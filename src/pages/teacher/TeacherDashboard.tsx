@@ -321,7 +321,7 @@ const TeacherDashboard = () => {
                     <div className="mb-2 flex items-center gap-2">
                       <Badge variant="secondary" className="gap-1">
                         <Icon className="h-3 w-3" />
-                        {activityTypeLabels[activity.activity_type]}
+                        {activityTypeLabels[activity.activity_type] || activity.activity_type}
                       </Badge>
                       <Badge variant={activity.is_published ? 'default' : 'outline'}>
                         {activity.is_published ? 'Published' : 'Draft'}

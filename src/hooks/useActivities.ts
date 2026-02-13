@@ -17,7 +17,7 @@ interface Activity {
   description: string | null;
   instructions: string | null;
   subject_id: string;
-  activity_type: ActivityType | 'mixed';
+  activity_type: ActivityType | 'mixed' | string;
   created_by: string;
   deadline: string | null;
   total_marks: number;
@@ -56,7 +56,7 @@ interface CreateActivityData {
   description?: string;
   instructions?: string;
   subject_id: string;
-  activity_type?: ActivityType | 'mixed';
+  activity_type?: ActivityType | 'mixed' | string;
   deadline?: string;
   total_marks?: number;
   is_published?: boolean;

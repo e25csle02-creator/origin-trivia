@@ -419,7 +419,7 @@ const StudentDashboard = () => {
                     <div className="mb-2 flex items-center gap-2 flex-wrap">
                       <Badge variant="secondary" className="gap-1">
                         <Icon className="h-3 w-3" />
-                        {activityTypeLabels[activity.activity_type]}
+                        {activityTypeLabels[activity.activity_type] || activity.activity_type}
                       </Badge>
                       <Badge className={status.color}>
                         <StatusIcon className="mr-1 h-3 w-3" />

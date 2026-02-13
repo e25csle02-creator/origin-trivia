@@ -48,6 +48,26 @@ const activityTypeIcons: Record<string, React.ElementType> = {
   numerical: Hash,
   output_prediction: Terminal,
   file_upload: Upload,
+  file_upload: Upload,
+};
+
+const activityTypeLabels: Record<string, string> = {
+  mcq: 'MCQ',
+  checkbox: 'Checkbox',
+  short_answer: 'Short Answer',
+  paragraph: 'Paragraph',
+  dropdown: 'Dropdown',
+  numerical: 'Numerical',
+  fill_blanks: 'Fill in Blanks',
+  file_upload: 'File Upload',
+  code_completion: 'Code Completion',
+  output_prediction: 'Output Prediction',
+  trace_execution: 'Trace Execution',
+  error_identification: 'Error Identification',
+  error_correction: 'Error Correction',
+  concept_identification: 'Concept Identification',
+  justification: 'Justification',
+  mixed: 'Mixed Activity',
 };
 
 const StudentActivity = () => {
@@ -213,10 +233,15 @@ const StudentActivity = () => {
         }
         break;
 
+      case 'error_correction':
+        // For error correction, we rely SOLELY on the code execution result (handleRunCode).
+        // If the user didn't run the code successfully, this function returns 0.
+        // The success score is captured in evaluatedAnswers via handleRunCode.
+        return { score: 0, is_correct: false, feedback: 'Please run the code to verify your answer.' };
+
       case 'short_answer': // If not AI
       case 'output_prediction':
       case 'error_identification':
-      case 'error_correction':
       case 'numerical':
       case 'concept_identification':
         // Exact string match (case insensitive? User said exact, but trimming is usually expected)
@@ -311,18 +336,24 @@ const StudentActivity = () => {
         const answer = answers[q.id];
         const aiResult = evaluatedAnswers[q.id] || {};
 
+        const evaluation = evaluateObjectiveQuestion(q, answer);
+        const score = (aiResult.score !== undefined) ? aiResult.score : evaluation?.score;
+        const feedback = aiResult.feedback || evaluation?.feedback;
+
         // Normalize answer structure based on type
         if (['mcq', 'checkbox', 'dropdown'].includes(q.question_type)) {
-          // For checkbox, we are sending comma-separated IDs in 'selected_option_id' field for now, 
-          // OR we might need to handle this in backend. 
-          // Assuming backend can store string.
-          return { question_id: q.id, selected_option_id: answer };
+          return {
+            question_id: q.id,
+            selected_option_id: answer,
+            score: score,
+            feedback: feedback
+          };
         }
         return {
           question_id: q.id,
           answer_text: answer,
-          score: (aiResult.score !== undefined) ? aiResult.score : evaluateObjectiveQuestion(q, answer)?.score,
-          feedback: aiResult.feedback || evaluateObjectiveQuestion(q, answer)?.feedback
+          score: score,
+          feedback: feedback
         };
       });
 
@@ -357,6 +388,7 @@ const StudentActivity = () => {
     setCompiling({ ...compiling, [questionId]: true });
     setCompileOutput({ ...compileOutput, [questionId]: { output: '', error: '' } });
 
+    console.log(`[Compiler] Sending request to: ${API_BASE_URL}/api/compile`);
     try {
       const response = await fetch(`${API_BASE_URL}/api/compile`, {
         method: 'POST',
@@ -369,6 +401,26 @@ const StudentActivity = () => {
         ...compileOutput,
         [questionId]: { output: data.output, error: data.error }
       });
+
+      // Auto-grade Error Correction if runs successfully
+      const q = activity.questions.find(q => q.id === questionId);
+      if (q && q.question_type === 'error_correction') {
+        if (!data.error && data.output) {
+          // Success!
+          setEvaluatedAnswers(prev => ({
+            ...prev,
+            [questionId]: { score: q.marks || 5, feedback: "Great Job! The code runs successfully." }
+          }));
+          toast({ title: 'Correct!', description: 'Code runs successfully. Full marks awarded.', className: 'bg-green-100 border-green-500 text-green-900' });
+        } else if (data.error) {
+          // Reset matched score if it fails again?
+          setEvaluatedAnswers(prev => {
+            const newPrev = { ...prev };
+            delete newPrev[questionId];
+            return newPrev;
+          });
+        }
+      }
     } catch (error: any) {
       toast({ title: 'Compilation Failed', description: 'Could not connect to compiler service.', variant: 'destructive' });
       setCompileOutput({
@@ -540,7 +592,10 @@ const StudentActivity = () => {
                 })}
               </div>
 
-              <div className="flex justify-end mt-2">
+              <div className="flex justify-end mt-2 items-center gap-2">
+                <p className="text-xs text-muted-foreground italic">
+                  Note: Java code must contain a <code>public static void main(String[] args)</code> method to execute.
+                </p>
                 <Button size="sm" variant="secondary" onClick={() => handleRunCode(question.id)} disabled={compiling[question.id] || disabled}>
                   {compiling[question.id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Terminal className="h-3 w-3 mr-1" />}
                   Run Code
@@ -566,7 +621,10 @@ const StudentActivity = () => {
             {question.code_template && <pre className="p-4 rounded-lg bg-muted text-sm overflow-x-auto font-mono">{question.code_template}</pre>}
             <Textarea placeholder="Complete the code..." value={val} onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })} disabled={disabled} className="font-mono" rows={4} />
 
-            <div className="flex justify-end">
+            <div className="flex justify-end items-center gap-2">
+              <p className="text-xs text-muted-foreground italic">
+                Note: Java code must contain a <code>public static void main(String[] args)</code> method to execute.
+              </p>
               <Button size="sm" variant="secondary" onClick={() => handleRunCode(question.id)} disabled={compiling[question.id] || disabled}>
                 {compiling[question.id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Terminal className="h-3 w-3 mr-1" />}
                 Run Code
@@ -641,7 +699,10 @@ const StudentActivity = () => {
             <Label className="text-xs text-muted-foreground">Correct the following code:</Label>
             {question.faulty_code && <pre className="p-4 rounded-lg bg-muted text-sm overflow-x-auto font-mono border border-destructive/20">{question.faulty_code}</pre>}
             <Textarea placeholder="Write the corrected code..." value={val} onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })} disabled={disabled} className="font-mono" rows={5} />
-            <div className="flex justify-end">
+            <div className="flex justify-end items-center gap-2">
+              <p className="text-xs text-muted-foreground italic">
+                Note: Java code must contain a <code>public static void main(String[] args)</code> method to execute.
+              </p>
               <Button size="sm" variant="secondary" onClick={() => handleRunCode(question.id)} disabled={compiling[question.id] || disabled}>
                 {compiling[question.id] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Terminal className="h-3 w-3 mr-1" />}
                 Run Code
@@ -687,7 +748,10 @@ const StudentActivity = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <Badge variant="secondary" className="gap-1"><Icon className="h-3 w-3" /> {activity.activity_type === 'mixed' ? 'Mixed Activity' : activity.activity_type.replace('_', ' ')}</Badge>
+                  <Badge variant="secondary" className="gap-1">
+                    <Icon className="h-3 w-3" />
+                    {activityTypeLabels[activity.activity_type] || activity.activity_type}
+                  </Badge>
                   {isCompleted && <Badge className="bg-success text-success-foreground"><CheckCircle className="mr-1 h-3 w-3" /> Submitted</Badge>}
                   {deadlinePassed && !isCompleted && <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3" /> Deadline Passed</Badge>}
                 </div>
